@@ -1,9 +1,12 @@
+import os
 import discord
+import random
+
 from src.logger import logger
 
 intents = discord.Intents.default()
 intents.message_content = True
-
+intents.reactions = True
 
 class DiscordClient(discord.Client):
     def __init__(self) -> None:
@@ -11,7 +14,9 @@ class DiscordClient(discord.Client):
         self.synced = False
         self.added = False
         self.tree = discord.app_commands.CommandTree(self)
-        self.activity = discord.Activity(type=discord.ActivityType.watching, name="/chat | /reset | /imagine")
+        self.activity = discord.Activity(
+            type=discord.ActivityType.watching, name="🧠 react")
+
 
     async def on_ready(self):
         await self.wait_until_ready()
@@ -25,15 +30,40 @@ class DiscordClient(discord.Client):
 
 
 class Sender():
-    async def send_message(self, interaction, send, receive):
+    bot_name = os.getenv('BOT_NAME')
+    model_name = os.getenv('MODEL_NAME')
+
+    async def send_message(self, interaction, send, receive, system_message=None):
         try:
             user_id = interaction.user.id
-            response = f'> **{send}** - <@{str(user_id)}> \n\n {receive}'
-            await interaction.followup.send(response)
+            system_msg = '' if system_message is None else f'> _**SYSTEM**: {system_message}_\n> \n'
+            response = f'{receive}\n🧠'
+            await interaction.followup.send(system_msg + response)
             logger.info(f"{user_id} sent: {send}, response: {receive}")
         except Exception as e:
             await interaction.followup.send('> **Error: Something went wrong, please try again later!**')
-            logger.exception(f"Error while sending:{send} in chatgpt model, error: {e}")
+            logger.exception(
+                f"Error while sending:{send} in chatgpt model, error: {e}")
+            
+    async def send_human_message(self, receive, text_channel):
+        try:
+            await text_channel.send(receive)
+        except Exception as e:
+            await text_channel.send('> **Error: Something went wrong, please try again later!**')
+            logger.exception(
+                f"Error while replying to message in chatgpt model, error: {e}")
+
+    async def reply_message(self, message, receive, pending_message=None):
+        try:
+            response = f'{receive}\n🧠'
+            await pending_message.delete()
+            await message.reply(response)
+                
+            logger.info(f"message replied sent: {receive}")
+        except Exception as e:
+            await message.reply('> **Error: Something went wrong, please try again later!**')
+            logger.exception(
+                f"Error while replying to message in chatgpt model, error: {e}")
 
     async def send_image(self, interaction, send, receive):
         try:
@@ -44,4 +74,5 @@ class Sender():
             logger.info(f"{user_id} sent: {send}, response: {receive}")
         except Exception as e:
             await interaction.followup.send('> **Error: Something went wrong, please try again later!**')
-            logger.exception(f"Error while sending:{send} in dalle model, error: {e}")
+            logger.exception(
+                f"Error while sending:{send} in dalle model, error: {e}")
