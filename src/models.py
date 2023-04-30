@@ -40,8 +40,9 @@ class OpenAIModel(ModelInterface):
         response = await openai.ChatCompletion.acreate(
             model=self.model_engine,
             messages=messages,
-#            temperature=1,
-#            top_p=0.1,
+#            temperature=0.4,
+#            top_p=0.5,
+#            top_k=10,
             max_tokens=2000/4,  # 1 token ~= 4 characters. discord limit = 2000 characters
         )
         return response
@@ -50,9 +51,12 @@ class OpenAIModel(ModelInterface):
         response = await openai.Completion.acreate(
             model=self.model_engine,
             prompt=prompt,
-#            temperature=2,
-#            top_p=0.1,
-            max_tokens=500/4,  # 1 token ~= 4 characters. discord limit = 2000 characters
+            temperature=1,
+            top_p=0.5,
+            top_k=120,
+            repeat_penalty=1.3,
+            repeat_last_n=512,
+            max_tokens=2000/4,  # 1 token ~= 4 characters. discord limit = 2000 characters
             stop=stop
         )
         return response

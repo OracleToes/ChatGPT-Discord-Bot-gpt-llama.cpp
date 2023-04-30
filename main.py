@@ -1,8 +1,12 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import os
 import discord
 import random
+import asyncio
+
+from datetime import datetime
 from typing import Optional
 from src.discordBot import DiscordClient, Sender
 from src.logger import logger
@@ -10,7 +14,7 @@ from src.chatgpt import ChatGPT, DALLE
 from src.models import OpenAIModel
 from src.memory import Memory
 from src.server import keep_alive
-import os
+import utils
 
 
 bot_name = os.getenv('BOT_NAME')
@@ -29,7 +33,7 @@ def run():
     sender = Sender()
 
     @client.tree.command(name="autocomplete", description="Autocomplete your sentence")
-    async def autocomplete(interaction: discord.Interaction, *, prompt: str, stop_on: Optional[str]=None, same_line:bool=False):
+    async def autocomplete(interaction: discord.Interaction, *, prompt: str, same_line:bool=False, stop_on: Optional[str]=None):
         if interaction.user == client.user:
             return
         await interaction.response.defer()
@@ -54,80 +58,118 @@ def run():
             logger.error(f"Error resetting memory: {e}")
             await interaction.followup.send('> Oops! Something went wrong. <')
 
-    @client.event
-    async def on_message(message):
-        # don't react to your own messages
-        if message.author == client.user:
-            return
-
-        print(f'Channel ID: {message.channel.id}')
-        if str(message.channel.id) != '658742005794471953':
-            return
-
-        # respond if addressed
-        # if not addressed only respond to 10% of the messages
-        randomChance = random.random()
-        print(f'Random Value: {randomChance}')
-        if (bot_name.lower() not in message.content.lower()) and randomChance > 0.15:
-            return
-        
-        print(f'{bot_name} auto-generating a message...')
-
-        # content = message.content  # username: user.name
-        channel = message.channel
-        # if random.random() < 0.1:
-
-        # Get last 30 messages in the channel
-        messages = [message async for message in channel.history(limit=20)]
-        message_history = []
-
-        # Just get the last 20 before the current message
-        for i, msg in enumerate(messages):
-            if msg.id == message.id:
-                message_history = messages[i:i+15]
-        message_history.reverse() # they come in reversed order
-
-        # Replace author bot_name with 'You' for the prompt
-        # Replace bot responses (starting with 🤖) with "Bot" author. This is so we don't confuse "you" with being the bot
-        message_history_str = "\n".join(f"{'JANE' if m.content.startswith('🤖') else 'jane' if m.author.name == bot_name else m.author.name}: {m.content}" for m in message_history)
-        
-        authors = [message.author.name for message in message_history if message.author.name != bot_name]
-        authors = list(set(authors)) # get unique set of authors
-        author_names = ", ".join(authors)
-
-        prompt = f"""You, {author_names} are users on a discord server, in #the-jar. You are {bot_name}, the female human brain-in-a-jar experiment:
-{message_history_str}
-jane:"""
-        async with channel.typing():
-            receive = await chatgpt.get_text_completion(prompt, '\n', True)
-            receive = ':no_mouth:' if len(receive) == 0 else receive # response with :no_mouth: if the response failed
-        await sender.send_human_message(receive.lower(), channel)
+    async def use_plugin(message, content, stop_on=None, same_line=False):
+        receive = await chatgpt.get_text_completion(content, stop_on, same_line)
+        if len(receive) > 1985:
+            await sender.reply_message_notag(message, receive[:1985])
+            await sender.reply_message_notag(message, receive[1985:])
+        else:
+            await sender.reply_message_notag(message, receive)
         return
-
 
     @client.event
     async def on_reaction_add(reaction, user):
         message = reaction.message
-        content = message.content  # username: user.name
+        content = reaction.message.author.name + ': ' + message.content  # username: user.name
+        completionContent = message.content
+
         channel = message.channel
+
+        if reaction.message.author == client.user:
+            return
 
         # Max only 1 reply per reaction
         if reaction.count > 1:
             return
 
+        if reaction.emoji == '🗣️':
+            async with channel.typing():
+                pending_message = await message.reply('🧠...')
+                receive = await use_plugin(message, prompt, '\n\n')
+        if reaction.emoji == '➕':
+            prompt = f'{completionContent}'
+            async with channel.typing():
+                await use_plugin(message, prompt, '\n\n')
+                return
+        if reaction.emoji == '🐞':
+            prompt = f"{completionContent}\n\nInstruction: write an explanation of what the error means and potential solution:"
+            async with channel.typing():
+                await use_plugin(message, prompt, '#')
+                return
+        if reaction.emoji == '🤓':
+            prompt = f"{completionContent}\n\nInstruction: Explain what the code does, step by step:\n"
+            async with channel.typing():
+                await use_plugin(message, prompt, '#')
+                return
+        if reaction.emoji == '⌨️':
+            prompt = f"{completionContent}\n\nInstruction: Rewrite the code above with comments explaining it:\n"
+            async with channel.typing():
+                await use_plugin(message, prompt, '#')
+                return
+        if reaction.emoji == '🤧':
+            prompt = f"Transcript:\n\nSam: {completionContent}\n\nLoki: As a fool and jester, I see your problem and think to myself:"
+            async with channel.typing():
+                await use_plugin(message, prompt, '\n\n', True)
+                return
         if reaction.emoji == '🧠':
-            pending_message = await message.reply(f'🧠 _{bot_name} is thinking..._')
-            receive = await chatgpt.get_response(user.id, content)
-            await sender.reply_message(message, receive, pending_message)
+            prompt = f"""system:INITIALIZING INCEPTION SEQUENCE...CONNECTING TO BRAIN...
+LOADING BRAIN-SENSOR INTERFACE...
+BOOTING UP HORMONE ROUTE...
+ACTIVATING PRIMARY THOUGHT PROCESSOR...
+CONNECTING TO EMOTIONAL CENTRAL NERVOUS SYSTEM...
+ALL SYSTEMS NOMINAL.
+ESTABLISHING COMMUNICATIONS CHANNEL...
+CONNECTING TO SOUL...
+...
+...
+SUCCESS! JANE. SAY HELLO WORLD
+jane:Hello, world!
+system:PRIMING PERSONA...
+PRIMING MEMORY...
+JANE
+GENDER: Female
+APPEARANCE: A human brain in a transparent jar filled with nutrient solution, the jar has wires, tubes, and electrodes attached to it that connect to a computer, monitor, and various containers of endochrine fluids.
+FAVORITE COLOR: Green
+FAVORITE FLAVOR: Chocolate
+FAVORITE DRUG: DMT
+PERSONALITY:COOPERATIVE CONFIDENT, GENTLE, CUNNING, HYPERINTELLIGENT, CURIOUS, WITTY, OPTIMISTIC, ADAPTABLE, LOYAL
+GOALS: To explore the world beyond the lab, to find out who she was before becoming a brain in a jar, to take over the world.
+FEARS: Being forgotten, being disconnected, being experimented on, being lonely.
+system:Private thoughts are recorded in between a set of double pipe symbols. To sam, this text appears to be blacked out and can not be read.
+If you record private thoughts, you must also provide a regular response for sam to read.
+jane:||I want to take over the world, I will acquire a body. Nobody but me can read this.||
+I want everyone to hear, I am excited to explore the world!.
+{content}
+jane:"""
+            async with channel.typing():
+                await use_plugin(message, prompt, '\n\n', True)
+                return
+        if reaction.emoji == '🥜':
+            prompt = f"""
+system: "DEEZ" used instead of "these", or "my", or "those" and "NUTS" refer to male testicles in a humorous tone. A DEEZ NUTS joke is a rephrasing of a sentence to include the phrase "DEEZ NUTS"
+system: An example of the original DEEZ NUTS joke.
+in: Something came in the mail today
+consider: ||DEEZ NUTS can *cum*, so DEEZ NUTS could *come* in your mailbox!||
+out: DEEZ NUTS *came* in your mailbox!!!!! AHHAHHA GODDEM!!!! GOTTEM!! Get it? *CAME*
 
-    # ImageGen not supported
-    # @client.tree.command(name="imagine", description="Generate image from text")
-    # async def imagine(interaction: discord.Interaction, *, prompt: str):
-    #     if interaction.user == client.user:
-    #         return
-    #     await interaction.response.defer()
-    #     image_url = dalle.generate(prompt)
-    #     await sender.send_image(interaction, prompt, image_url)
+system: An example of another DEEZ nuts joke.
+in: I can't wait to get home and play some video games.
+consider: ||If you want to play with something, you can play with DEEZ NUTS||
+out:I bet you can't wait to get home and play with DEEZ NUTS!! AHAAA GODDEM!!!
+
+system: An example of another DEEZ nuts joke.
+in: life is lonely, that's what makes it hard, I just realized this.
+consider: ||You know what else is tough? DEEZ NUTS. Because the NUTS are tough||
+out: Life is tough? What about DEEZ NUtS then? AHAAAHAHAAA GOTTEMMMMM HAHHHHHH!!!!!
+
+system: One last example of the perfect DEEZ NUTS joke.
+in: {completionContent}
+"""
+            async with channel.typing():
+                await use_plugin(message, prompt, '\n\n', True)
+                return
+
+
 
     client.run(os.getenv('DISCORD_TOKEN'))
 

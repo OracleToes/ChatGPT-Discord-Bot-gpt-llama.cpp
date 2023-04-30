@@ -56,7 +56,6 @@ class Sender():
     async def reply_message(self, message, receive, pending_message=None):
         try:
             response = f'{receive}\n🧠'
-            await pending_message.delete()
             await message.reply(response)
                 
             logger.info(f"message replied sent: {receive}")
@@ -65,14 +64,13 @@ class Sender():
             logger.exception(
                 f"Error while replying to message in chatgpt model, error: {e}")
 
-    async def send_image(self, interaction, send, receive):
+    async def reply_message_notag(self, message, receive, pending_message=None):
         try:
-            user_id = interaction.user.id
-            response = f'> **{send}** - <@{str(user_id)}> \n\n'
-            await interaction.followup.send(response)
-            await interaction.followup.send(receive)
-            logger.info(f"{user_id} sent: {send}, response: {receive}")
+            response = f'{receive}'
+            await message.reply(response)
+                
+            logger.info(f"message replied sent: {receive}")
         except Exception as e:
-            await interaction.followup.send('> **Error: Something went wrong, please try again later!**')
+            await message.reply('> **Error: Something went wrong, please try again later!**')
             logger.exception(
-                f"Error while sending:{send} in dalle model, error: {e}")
+                f"Error while replying to message in chatgpt model, error: {e}")
