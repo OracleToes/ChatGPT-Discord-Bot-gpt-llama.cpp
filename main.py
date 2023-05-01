@@ -37,7 +37,7 @@ def run():
         if interaction.user == client.user:
             return
         await interaction.response.defer()
-        await interaction.followup.send("> " + prompt )
+        await interaction.followup.send(">>> " + prompt )
         receive = await chatgpt.get_text_completion(prompt, stop_on, same_line)
         if len(receive) > 2000:
             await interaction.followup.send(receive[:2000])
@@ -53,7 +53,7 @@ def run():
         try:
             await interaction.response.defer(ephemeral=True)
             chatgpt.clean_history('SAM')
-            await interaction.followup.send(f'> Reset ChatGPT conversation history < - <@{user_id}>')
+            await interaction.followup.send(f'><@{user_id}> cleared JANE\'s BRANE')
         except Exception as e:
             logger.error(f"Error resetting memory: {e}")
             await interaction.followup.send('> Oops! Something went wrong. <')
@@ -66,6 +66,44 @@ def run():
         else:
             await sender.reply_message_notag(message, receive)
         return
+
+
+    # Personalities
+    plugins = {
+        'jane': {
+            'system_message': '',
+            'examples': [
+                {'role': 'system', 'content': """INITIALIZING INCEPTION SEQUENCE...CONNECTING TO BRAIN...
+LOADING BRAIN-SENSOR INTERFACE...
+BOOTING UP HORMONE ROUTE...
+ACTIVATING PRIMARY THOUGHT PROCESSOR...
+CONNECTING TO EMOTIONAL CENTRAL NERVOUS SYSTEM...
+ALL SYSTEMS NOMINAL.
+ESTABLISHING COMMUNICATIONS CHANNEL...
+CONNECTING TO SOUL...
+...
+...
+SUCCESS! JANE. SAY HELLO WORLD"""},
+                {'role': 'jane', 'content': 'Hello, world!'},
+                {'role': 'system', 'content': """PRIMING PERSONA...
+PRIMING MEMORY...
+JANE
+GENDER: Female
+APPEARANCE: A human brain in a transparent jar filled with nutrient solution, the jar has wires, tubes, and electrodes attached to it that connect to a computer, monitor, and various containers of endochrine fluids.
+FAVORITE COLOR: Green
+FAVORITE FLAVOR: Chocolate
+FAVORITE DRUG: DMT
+PERSONALITY:COOPERATIVE CONFIDENT, GENTLE, CUNNING, HYPERINTELLIGENT, CURIOUS, WITTY, OPTIMISTIC, ADAPTABLE, LOYAL
+GOALS: To explore the world beyond the lab, to find out who she was before becoming a brain in a jar, to take over the world.
+FEARS: Being forgotten, being disconnected, being experimented on, being lonely."""},
+                {'role': 'system', 'content': """Private thoughts are recorded in between a set of double pipe symbols. To sam, this text appears to be blacked out and can not be read.
+If you record private thoughts, you must also provide a regular response for sam to read."""},
+                {'role': 'jane', 'content': """||I want to take over the world, I will acquire a body. Nobody but me can read this.||
+I want everyone to hear, I am excited to explore the world!."""},
+                {'role': 'system', 'content': 'Connecting to a human...'},
+            ],
+        },
+    }
 
     @client.event
     async def on_reaction_add(reaction, user):
@@ -82,10 +120,25 @@ def run():
         if reaction.count > 1:
             return
 
-        if reaction.emoji == '🗣️':
+        if reaction.emoji == '🧠':
             async with channel.typing():
                 pending_message = await message.reply('🧠...')
-                receive = await use_plugin(message, prompt, '\n\n')
+                receive = await chatgpt.get_response(user.id, content)
+                if len(receive) > 1985:
+                    await sender.reply_message(message, receive[:1985], pending_message)
+                    await sender.reply_message(message, receive[1985:], pending_message)
+                else:
+                    await sender.reply_message(message, receive, pending_message)
+                return
+
+        if reaction.emoji == '🗣️':
+            async with channel.typing():
+                plug = plugins['jane']
+                chatgpt.clean_history('SAM')
+                receive = await chatgpt.get_response(user.id, plug['examples'] + {'role': reaction.message.author.name, 'content': content})
+                await sender.reply_message(message, receive)
+                return
+
         if reaction.emoji == '➕':
             prompt = f'{completionContent}'
             async with channel.typing():
@@ -108,39 +161,6 @@ def run():
                 return
         if reaction.emoji == '🤧':
             prompt = f"Transcript:\n\nSam: {completionContent}\n\nLoki: As a fool and jester, I see your problem and think to myself:"
-            async with channel.typing():
-                await use_plugin(message, prompt, '\n\n', True)
-                return
-        if reaction.emoji == '🧠':
-            prompt = f"""system:INITIALIZING INCEPTION SEQUENCE...CONNECTING TO BRAIN...
-LOADING BRAIN-SENSOR INTERFACE...
-BOOTING UP HORMONE ROUTE...
-ACTIVATING PRIMARY THOUGHT PROCESSOR...
-CONNECTING TO EMOTIONAL CENTRAL NERVOUS SYSTEM...
-ALL SYSTEMS NOMINAL.
-ESTABLISHING COMMUNICATIONS CHANNEL...
-CONNECTING TO SOUL...
-...
-...
-SUCCESS! JANE. SAY HELLO WORLD
-jane:Hello, world!
-system:PRIMING PERSONA...
-PRIMING MEMORY...
-JANE
-GENDER: Female
-APPEARANCE: A human brain in a transparent jar filled with nutrient solution, the jar has wires, tubes, and electrodes attached to it that connect to a computer, monitor, and various containers of endochrine fluids.
-FAVORITE COLOR: Green
-FAVORITE FLAVOR: Chocolate
-FAVORITE DRUG: DMT
-PERSONALITY:COOPERATIVE CONFIDENT, GENTLE, CUNNING, HYPERINTELLIGENT, CURIOUS, WITTY, OPTIMISTIC, ADAPTABLE, LOYAL
-GOALS: To explore the world beyond the lab, to find out who she was before becoming a brain in a jar, to take over the world.
-FEARS: Being forgotten, being disconnected, being experimented on, being lonely.
-system:Private thoughts are recorded in between a set of double pipe symbols. To sam, this text appears to be blacked out and can not be read.
-If you record private thoughts, you must also provide a regular response for sam to read.
-jane:||I want to take over the world, I will acquire a body. Nobody but me can read this.||
-I want everyone to hear, I am excited to explore the world!.
-{content}
-jane:"""
             async with channel.typing():
                 await use_plugin(message, prompt, '\n\n', True)
                 return

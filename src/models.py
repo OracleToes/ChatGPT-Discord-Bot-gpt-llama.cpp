@@ -55,7 +55,7 @@ class OpenAIModel(ModelInterface):
             top_p=0.5,
             top_k=120,
             repeat_penalty=1.3,
-            repeat_last_n=512,
+            repeat_last_n=1024,
             max_tokens=2000/4,  # 1 token ~= 4 characters. discord limit = 2000 characters
             stop=stop
         )
