@@ -1,0 +1,6 @@
+OPENAI_API = /home/momiro/llama.cpp/models/ggml-vic7b-uncensored-q5_1.bin
+OPENAI_API_BASE_URL= 'http://localhost:8000/v1'
+OPENAI_MODEL_ENGINE = 'gpt-3.5-turbo'
+SYSTEM_MESSAGE = ''
+DISCORD_TOKEN = MTA5OTcyNjE2NDM5MTYyODkyMg.Gfq-fO.DJUl78x9Bm93qRB8T9R6StT7twuz70QCN27UZs
+BOT_NAME=JANE
